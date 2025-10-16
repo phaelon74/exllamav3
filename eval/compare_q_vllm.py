@@ -89,21 +89,33 @@ def load_vllm(model_dir: str):
     
     Args:
         model_dir: Path to model directory or HuggingFace model ID
+                  Can also be a list: [model_dir, vllm_kwargs_dict]
     
     Returns:
         Tuple of (llm_instance, bpw_layer, bpw_head, vram_bits)
     """
+    # Parse input - allow passing custom vLLM parameters
+    vllm_kwargs = {}
+    if isinstance(model_dir, list):
+        model_dir, vllm_kwargs = model_dir
+    
     print(f"Loading vLLM model from: {model_dir}")
     
-    # Initialize vLLM with appropriate settings for evaluation
-    llm = LLM(
-        model=model_dir,
-        gpu_memory_utilization=0.9,
-        max_model_len=2048,  # Match the eval context length
-        trust_remote_code=True,
-        # Enable tensor parallelism if needed
-        # tensor_parallel_size=1,
-    )
+    # Default vLLM parameters for evaluation
+    default_params = {
+        "model": model_dir,
+        "gpu_memory_utilization": 0.9,
+        "max_model_len": 2048,  # Eval uses 2048, but you can override
+        "trust_remote_code": True,
+    }
+    
+    # Merge user-provided kwargs (they override defaults)
+    default_params.update(vllm_kwargs)
+    
+    print(f"vLLM parameters: {default_params}")
+    
+    # Initialize vLLM
+    llm = LLM(**default_params)
     
     # Get storage information
     bpw_layer, bpw_head, vram_bits = get_storage_info_vllm(llm)

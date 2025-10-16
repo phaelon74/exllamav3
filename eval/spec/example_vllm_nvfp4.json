@@ -3,7 +3,16 @@
         "load_fn": "vllm",
         "fwd_fn": "vllm",
         "label": "vLLM NVFP4",
-        "model_dir": "/path/to/your/nvfp4/compressed_tensor/model"
+        "model_dir": [
+            "/media/fmodels/TheHouseOfTheDude/Behemoth-R1-123B-v2_Compressed-Tensors/NVFP4",
+            {
+                "quantization": "compressed-tensors",
+                "tensor_parallel_size": 2,
+                "max_model_len": 2048,
+                "gpu_memory_utilization": 0.80,
+                "disable_custom_all_reduce": true
+            }
+        ]
     }
 ]
 
