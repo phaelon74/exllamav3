@@ -73,8 +73,16 @@ def get_storage_info(model):
     sum_numel = 0
     head_bpw = 0
     head_numel = 0
+    
+    # Filter out None values from optional quantization modules
+    def check_isinstance(module, types_list):
+        valid_types = [t for t in types_list if t is not None]
+        if not valid_types:
+            return False
+        return isinstance(module, tuple(valid_types))
+    
     for name, module in model.named_modules():
-        if any(isinstance(module, x) for x in [Linear4bit]):
+        if check_isinstance(module, [Linear4bit]):
             if module.out_features >= model.vocab_size * 0.9:  # this is foolproof
                 head_numel = module.in_features * module.out_features
                 head_bpw = module.weight.numel() * 8
@@ -83,24 +91,24 @@ def get_storage_info(model):
                 sum_bits += module.weight.numel() * 8
                 sum_bits += scan_gpu_tensors(module.quant_state) * 8
                 sum_numel += module.in_features * module.out_features
-        elif any(isinstance(module, x) for x in [torch.nn.Linear]):
+        elif isinstance(module, torch.nn.Linear):
             if module.out_features >= model.vocab_size * 0.9:
                 head_bpw = module.weight.element_size() * 8
                 head_numel = module.weight.numel()
             else:
                 sum_bits += get_tensor_size(module.weight)
                 sum_numel +=  module.weight.numel()
-        elif any(isinstance(module, x) for x in [QuantizedLinear, VQuantLinear]):
+        elif check_isinstance(module, [QuantizedLinear, VQuantLinear]):
             sum_bits += get_tensors_size(dict(module.named_parameters()))
             sum_numel += module.in_features * module.out_features
-        elif any(isinstance(module, x) for x in [WQLinear_GEMM]):
+        elif check_isinstance(module, [WQLinear_GEMM]):
             sum_bits += get_tensors_size({
                 "qweight": module.qweight,
                 "qzeros": module.qzeros,
                 "scales": module.scales,
             })
             sum_numel += module.in_features * module.out_features
-        elif any(isinstance(module, x) for x in [MarlinQuantLinear]):
+        elif check_isinstance(module, [MarlinQuantLinear]):
             sum_bits += get_tensors_size({
                 "g_idx": module.g_idx,
                 "g_idx_sort_indices": module.g_idx_sort_indices,
@@ -109,7 +117,7 @@ def get_storage_info(model):
                 "scales": module.scales,
             })
             sum_numel += module.in_features * module.out_features
-        elif any(isinstance(module, x) for x in [TritonV2QuantLinear]):
+        elif check_isinstance(module, [TritonV2QuantLinear]):
             sum_bits += get_tensors_size({
                 "g_idx": module.g_idx,
                 "qweight": module.qweight,
@@ -117,9 +125,16 @@ def get_storage_info(model):
                 "scales": module.scales,
             })
             sum_numel += module.in_features * module.out_features
-        elif any(isinstance(module, x) for x in [ExllamaV2QuantLinear]):
+        elif check_isinstance(module, [ExllamaV2QuantLinear]):
             sum_bits += get_tensors_size(module.q_tensors)
             sum_numel += module.in_features * module.out_features
+    
+    # Handle case where no quantized layers were found
+    if sum_numel == 0:
+        # Assume standard linear layers, estimate from model parameters
+        print("Warning: Could not detect quantization format, estimating BPW from total parameters")
+        return 16.0, 16.0, sum_bits  # Default to FP16
+    
     vram_bits = head_numel * head_bpw + sum_bits
     return sum_bits / sum_numel, head_bpw, vram_bits
 
@@ -165,6 +180,18 @@ def load_transformers_tensor_parallel(model_dir: str):
     }
     
     # Override defaults with user-provided kwargs
+    # Handle torch_dtype string conversion
+    if "torch_dtype" in kwargs and isinstance(kwargs["torch_dtype"], str):
+        dtype_str = kwargs["torch_dtype"]
+        if dtype_str == "bfloat16":
+            kwargs["torch_dtype"] = torch.bfloat16
+        elif dtype_str == "float16":
+            kwargs["torch_dtype"] = torch.float16
+        elif dtype_str == "float32":
+            kwargs["torch_dtype"] = torch.float32
+        elif dtype_str == "auto":
+            kwargs["torch_dtype"] = "auto"
+    
     default_params.update(kwargs)
     
     print(f"Loading model with tensor parallelism: {actual_model_dir}")

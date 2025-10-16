@@ -6,7 +6,6 @@
         "model_dir": [
             "/media/fmodels/TheHouseOfTheDude/Behemoth-R1-123B-v2_Compressed-Tensors/NVFP4",
             {
-                "torch_dtype": "bfloat16",
                 "trust_remote_code": true
             }
         ]
