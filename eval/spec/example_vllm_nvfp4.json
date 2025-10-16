@@ -8,7 +8,7 @@
             {
                 "quantization": "compressed-tensors",
                 "tensor_parallel_size": 2,
-                "max_model_len": 2048,
+                "max_model_len": 2049,
                 "gpu_memory_utilization": 0.80,
                 "disable_custom_all_reduce": true
             }

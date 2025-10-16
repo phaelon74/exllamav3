@@ -156,11 +156,11 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
     input_token_ids = input_ids[0].tolist()
     
     # Use vLLM's generate with prompt_logprobs to get log probabilities
-    # We set max_tokens=0 since we ONLY need prompt logprobs, NO generation
+    # We set max_tokens=1 (minimum allowed) - we only need prompt logprobs
     # We use logprobs=None to get ALL vocab logprobs (if supported)
     sampling_params = SamplingParams(
         temperature=0.0,
-        max_tokens=0,  # Don't generate - only get prompt logprobs
+        max_tokens=1,  # Minimum allowed by vLLM
         prompt_logprobs=None,  # Get logprobs for all vocab tokens if possible
         logprobs=None,  # Get all logprobs
     )
