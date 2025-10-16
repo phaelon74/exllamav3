@@ -1,4 +1,6 @@
 import torch
+import os
+import json
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
 try:
@@ -172,11 +174,32 @@ def get_storage_info(model):
 
 @torch.inference_mode
 def load_transformers(model_dir: str, auto = False, bf16 = False):
-    model = AutoModelForCausalLM.from_pretrained(
-        model_dir,
-        device_map = "auto" if auto else "cuda:0",
-        torch_dtype = torch.bfloat16 if bf16 else torch.half
-    )
+    # Check if this is a compressed-tensors model
+    config_path = os.path.join(model_dir, "config.json")
+    is_compressed = False
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            if 'quantization_config' in config and config['quantization_config'].get('quant_method') == 'compressed-tensors':
+                is_compressed = True
+                print(f"DEBUG: Detected compressed-tensors model")
+    
+    load_kwargs = {
+        "device_map": "auto" if auto else "cuda:0",
+        "torch_dtype": torch.bfloat16 if bf16 else torch.half
+    }
+    
+    # For compressed-tensors models, we need to trust remote code
+    if is_compressed:
+        load_kwargs["trust_remote_code"] = True
+        print(f"DEBUG: Loading with trust_remote_code=True for compressed-tensors")
+    
+    model = AutoModelForCausalLM.from_pretrained(model_dir, **load_kwargs)
+    
+    # Verify the model loaded correctly
+    print(f"DEBUG: Model type: {type(model)}")
+    print(f"DEBUG: First layer type: {type(list(model.modules())[10])}")
+    
     bpw_layer, bpw_head, vram_bits = get_storage_info(model)
     return model, bpw_layer, bpw_head, vram_bits
 
