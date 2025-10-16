@@ -9,7 +9,7 @@ try:
     import qtip
     from qtip.lib.linear.quantized_linear import QuantizedLinear
     from qtip.lib.utils.unsafe_import import model_from_hf_path
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     pass
 
 def get_tensors_size(tensors):

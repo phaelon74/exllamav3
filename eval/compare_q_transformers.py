@@ -5,29 +5,29 @@ try:
     from gptqmodel.nn_modules.qlinear.marlin import MarlinQuantLinear
     from gptqmodel.nn_modules.qlinear.tritonv2 import TritonV2QuantLinear
     from gptqmodel.nn_modules.qlinear.exllamav2 import ExllamaV2QuantLinear
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     MarlinQuantLinear = None
     TritonV2QuantLinear = None
     ExllamaV2QuantLinear = None
 
 try:
     from aqlm import QuantizedLinear
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     QuantizedLinear = None
 
 try:
     from awq.modules.linear import WQLinear_GEMM
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     WQLinear_GEMM = None
 
 try:
     from vptq import VQuantLinear
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     VQuantLinear = None
 
 try:
     from bitsandbytes.nn import Linear4bit
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     Linear4bit = None
 
 def get_tensors_size(tensors):

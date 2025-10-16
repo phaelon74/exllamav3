@@ -2,7 +2,7 @@ import torch
 try:
     from exllamav2 import ExLlamaV2, ExLlamaV2Config, ExLlamaV2Cache
     from exllamav2.model import ExLlamaV2Linear
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     pass
 
 def get_tensor_size(tensors):
