@@ -1,9 +1,10 @@
 {
     "tokenize_fn": "transformers",
-    "tokenizer_dir": "/path/to/your/small/nvfp4/model",
+    "tokenizer_dir": "/media/fmodels/TheHouseOfTheDude/Llama-3.1-8B-Instruct/",
     "dataset": "wiki2",
     "eval_stride": 512,
     "eval_len": 2048,
     "max_rows": 20
 }
+
 
