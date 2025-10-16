@@ -177,12 +177,20 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
         
         output = outputs[0]
         
+        # Debug: Print what vLLM actually returned
+        print(f"DEBUG: Output type: {type(output)}")
+        print(f"DEBUG: Output attributes: {dir(output)}")
+        print(f"DEBUG: Has prompt_logprobs: {hasattr(output, 'prompt_logprobs')}")
+        if hasattr(output, 'prompt_logprobs'):
+            print(f"DEBUG: prompt_logprobs type: {type(output.prompt_logprobs)}")
+            print(f"DEBUG: prompt_logprobs value: {output.prompt_logprobs}")
+        
         # Extract prompt logprobs
         # vLLM returns prompt_logprobs as a list of dicts, where each dict maps token_id -> Logprob object
-        prompt_logprobs = output.prompt_logprobs
+        prompt_logprobs = getattr(output, 'prompt_logprobs', None)
         
-        if prompt_logprobs is None or len(prompt_logprobs) == 0:
-            raise ValueError("vLLM did not return prompt_logprobs. Check vLLM version and configuration.")
+        if prompt_logprobs is None:
+            raise ValueError(f"vLLM did not return prompt_logprobs. Output has these attributes: {[a for a in dir(output) if not a.startswith('_')]}")
         
         # Get vocab size from the model
         vocab_size = model_instance.llm_engine.model_config.get_vocab_size()
