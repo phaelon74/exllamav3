@@ -6,7 +6,11 @@
         "model_dir": [
             "/media/fmodels/TheHouseOfTheDude/Behemoth-R1-123B-v2_Compressed-Tensors/NVFP4",
             {
-                "trust_remote_code": true
+                "trust_remote_code": true,
+                "max_memory": {
+                    "0": "38GiB",
+                    "1": "90GiB"
+                }
             }
         ]
     }
