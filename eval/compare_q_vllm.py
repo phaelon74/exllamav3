@@ -195,14 +195,31 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
         # Fill in the logprobs we have
         # prompt_logprobs[0] is None (no logprob for first token in most cases)
         # prompt_logprobs[1] onwards contain the logprobs for predicting tokens[1], tokens[2], etc.
+        
+        missing_tokens = 0
+        total_positions = 0
+        
         for pos in range(len(prompt_logprobs)):
-            if prompt_logprobs[pos] is not None:
+            if prompt_logprobs[pos] is not None and pos < seq_len:
+                # Check if actual next token is in the returned logprobs
+                if pos + 1 < len(input_token_ids):
+                    actual_next_token = input_token_ids[pos + 1]
+                    total_positions += 1
+                    
+                    if actual_next_token not in prompt_logprobs[pos]:
+                        missing_tokens += 1
+                        # Use minimum logprob from returned set as approximation
+                        min_logprob = min(lp.logprob for lp in prompt_logprobs[pos].values())
+                        # Assign slightly lower logprob for missing token
+                        logits[0, pos, actual_next_token] = min_logprob - 2.0
+                
+                # Fill in all returned logprobs
                 for token_id, logprob_obj in prompt_logprobs[pos].items():
                     logprob = logprob_obj.logprob
-                    # Store the logprob directly
-                    # These are already log probabilities, which is what we need
-                    if pos < seq_len:
-                        logits[0, pos, token_id] = logprob
+                    logits[0, pos, token_id] = logprob
+        
+        if missing_tokens > 0:
+            print(f"Warning: {missing_tokens}/{total_positions} actual next tokens not in top-500 logprobs")
         
         return logits
         
