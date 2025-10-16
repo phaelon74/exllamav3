@@ -87,7 +87,11 @@ def get_storage_info(model):
         return isinstance(module, tuple(valid_types))
     
     for name, module in model.named_modules():
-        if check_isinstance(module, [CompressedLinear]):
+        # Check for CompressedLinear by type or class name (fallback)
+        is_compressed = (check_isinstance(module, [CompressedLinear]) or 
+                        module.__class__.__name__ == 'CompressedLinear')
+        
+        if is_compressed:
             # Compressed-tensors quantization (NVFP4, etc.)
             # Sum all parameters in the compressed module
             module_bits = get_tensors_size(dict(module.named_parameters()))
@@ -108,6 +112,10 @@ def get_storage_info(model):
                 sum_bits += scan_gpu_tensors(module.quant_state) * 8
                 sum_numel += module.in_features * module.out_features
         elif isinstance(module, torch.nn.Linear):
+            # Skip CompressedLinear (handled above) - it inherits from Linear but has different attributes
+            if module.__class__.__name__ == 'CompressedLinear':
+                continue
+            # Regular linear layers
             if module.out_features >= model.vocab_size * 0.9:
                 head_bpw = module.weight.element_size() * 8
                 head_numel = module.weight.numel()
