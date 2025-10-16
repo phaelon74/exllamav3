@@ -157,12 +157,11 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
     
     # Use vLLM's generate with prompt_logprobs to get log probabilities
     # We set max_tokens=1 (minimum allowed) - we only need prompt logprobs
-    # prompt_logprobs=500 to get top-500 logprobs (ensures we capture actual next token)
-    # Higher value = better accuracy but slower
+    # prompt_logprobs=20 (maximum allowed by vLLM v0.1.dev)
     sampling_params = SamplingParams(
         temperature=0.0,
         max_tokens=1,  # Minimum allowed by vLLM
-        prompt_logprobs=500,  # Return top-500 logprobs per position (high coverage)
+        prompt_logprobs=20,  # Maximum allowed by vLLM (returns top-20)
         logprobs=1,  # Also get logprobs for generated tokens
     )
     
@@ -219,7 +218,7 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
                     logits[0, pos, token_id] = logprob
         
         if missing_tokens > 0:
-            print(f"Warning: {missing_tokens}/{total_positions} actual next tokens not in top-500 logprobs")
+            print(f"Warning: {missing_tokens}/{total_positions} actual next tokens not in top-20 logprobs")
         
         return logits
         
