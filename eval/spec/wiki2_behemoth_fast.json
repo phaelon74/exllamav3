@@ -1,0 +1,9 @@
+{
+    "tokenize_fn": "transformers",
+    "tokenizer_dir": "/media/fmodels/TheHouseOfTheDude/Behemoth-R1-123B-v2_Compressed-Tensors/NVFP4",
+    "dataset": "wiki2",
+    "eval_stride": 512,
+    "eval_len": 2048,
+    "max_rows": 5
+}
+
