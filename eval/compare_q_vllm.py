@@ -166,9 +166,12 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
     )
     
     try:
-        # Generate - vLLM v0.1.dev+ uses simple list of token IDs
+        # Generate - vLLM v0.1.dev+ requires TokensPrompt wrapper
+        from vllm import TokensPrompt
+        
+        prompt = TokensPrompt(prompt_token_ids=input_token_ids)
         outputs = model_instance.generate(
-            [input_token_ids],  # Just pass token list directly
+            [prompt],
             sampling_params,
         )
         
