@@ -167,10 +167,20 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
     
     try:
         # Generate (we only care about the prompt_logprobs in the output)
-        outputs = model_instance.generate(
-            prompt_token_ids=[input_token_ids],
-            sampling_params=sampling_params,
-        )
+        # Try different API formats for compatibility with different vLLM versions
+        try:
+            # Newer vLLM API (v0.6.0+)
+            from vllm import TokensPrompt
+            outputs = model_instance.generate(
+                prompts=[TokensPrompt(prompt_token_ids=input_token_ids)],
+                sampling_params=sampling_params,
+            )
+        except (ImportError, TypeError):
+            # Older vLLM API
+            outputs = model_instance.generate(
+                prompt_token_ids=[input_token_ids],
+                sampling_params=sampling_params,
+            )
         
         output = outputs[0]
         
