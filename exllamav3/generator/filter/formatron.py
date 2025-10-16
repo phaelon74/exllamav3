@@ -3,23 +3,50 @@ from ...tokenizer import Tokenizer
 import torch
 from functools import lru_cache
 
-try:
-    import kbnf
-    from formatron.integrations.utils import get_original_characters, default_mask_logits_fn, get_bit_mask
-    from formatron.formatter import FormatterBuilder
-    from formatron.config import EngineGenerationConfig
-    formatron_available = True
-except ModuleNotFoundError:
-    formatron_available = False
-except ImportError:
-    formatron_available = False
+# Lazy import to avoid pydantic compatibility issues
+formatron_available = None
+kbnf = None
+get_original_characters = None
+default_mask_logits_fn = None
+get_bit_mask = None
+FormatterBuilder = None
+EngineGenerationConfig = None
+
+def _check_formatron():
+    global formatron_available, kbnf, get_original_characters, default_mask_logits_fn
+    global get_bit_mask, FormatterBuilder, EngineGenerationConfig
+    
+    if formatron_available is not None:
+        return formatron_available
+    
+    try:
+        import kbnf as kbnf_module
+        from formatron.integrations.utils import (
+            get_original_characters as get_orig_chars,
+            default_mask_logits_fn as mask_fn,
+            get_bit_mask as bit_mask
+        )
+        from formatron.formatter import FormatterBuilder as FmtBuilder
+        from formatron.config import EngineGenerationConfig as EngineConfig
+        
+        kbnf = kbnf_module
+        get_original_characters = get_orig_chars
+        default_mask_logits_fn = mask_fn
+        get_bit_mask = bit_mask
+        FormatterBuilder = FmtBuilder
+        EngineGenerationConfig = EngineConfig
+        formatron_available = True
+    except (ModuleNotFoundError, ImportError, AttributeError):
+        formatron_available = False
+    
+    return formatron_available
 
 
 @lru_cache(10)
 def create_engine_vocabulary(
     tokenizer: Tokenizer,
     vocab_processors: list[callable] | None = None
-) -> kbnf.Vocabulary:
+):  # Removed type hint to avoid NameError when kbnf not installed
     vocab = tokenizer.get_vocab_dict()
     new_vocab = get_original_characters(vocab, vocab_processors)
     return kbnf.Vocabulary(
@@ -35,12 +62,12 @@ class FormatronFilter(Filter):
         trigger_token: int | None = None,
         prefix_str: str | None = None,
         eos_after_completed: bool = False,
-        formatter_builder: FormatterBuilder = None,
-        engine_config: EngineGenerationConfig = None,
+        formatter_builder = None,  # Type hint removed for lazy import
+        engine_config = None,  # Type hint removed for lazy import
         vocab_processors: list[callable] | None = None
     ):
-        if not formatron_available:
-            raise ValueError("Formatron package is not available.")
+        if not _check_formatron():
+            raise ValueError("Formatron package is not available or incompatible with installed pydantic version.")
 
         super().__init__(tokenizer, trigger_token, prefix_str, eos_after_completed)
         assert formatter_builder is not None
