@@ -157,11 +157,12 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
     
     # Use vLLM's generate with prompt_logprobs to get log probabilities
     # We set max_tokens=1 (minimum allowed) - we only need prompt logprobs
-    # prompt_logprobs=20 to get top-20 logprobs (increases chance of capturing actual next token)
+    # prompt_logprobs=500 to get top-500 logprobs (ensures we capture actual next token)
+    # Higher value = better accuracy but slower
     sampling_params = SamplingParams(
         temperature=0.0,
         max_tokens=1,  # Minimum allowed by vLLM
-        prompt_logprobs=20,  # Return top-20 logprobs per position (ensures we capture actual token)
+        prompt_logprobs=500,  # Return top-500 logprobs per position (high coverage)
         logprobs=1,  # Also get logprobs for generated tokens
     )
     
@@ -188,8 +189,8 @@ def fwd_vllm(model_instance, input_ids: torch.Tensor):
         vocab_size = model_instance.llm_engine.model_config.get_vocab_size()
         
         # Initialize logits tensor with very negative values (effectively zero probability)
-        # Using -1e10 instead of -100 to better represent very low probabilities
-        logits = torch.full((batch_size, seq_len, vocab_size), -1e10, dtype=torch.float32)
+        # Using -100 as default (avoids overflow in exp() later)
+        logits = torch.full((batch_size, seq_len, vocab_size), -100.0, dtype=torch.float32)
         
         # Fill in the logprobs we have
         # prompt_logprobs[0] is None (no logprob for first token in most cases)
