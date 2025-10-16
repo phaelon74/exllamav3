@@ -214,6 +214,26 @@ def load_transformers_auto_bf16(model_dir: str):
 @torch.inference_mode
 def fwd_transformers(model_instance, input_ids: torch.Tensor):
     input_ids = input_ids.to("cuda:0")
+    
+    # Check if model has compressed layers
+    has_compressed = False
+    for name, module in model_instance.named_modules():
+        if module.__class__.__name__ == 'CompressedLinear':
+            has_compressed = True
+            # Check if the module has a forward method
+            if hasattr(module, 'forward'):
+                print(f"DEBUG: CompressedLinear found: {name}, forward method: {type(module.forward)}")
+            if hasattr(module, 'weight'):
+                print(f"DEBUG: CompressedLinear has weight attribute, dtype: {module.weight.dtype}, shape: {module.weight.shape}")
+            else:
+                print(f"DEBUG: CompressedLinear does NOT have weight attribute")
+                if hasattr(module, 'packed_weight'):
+                    print(f"DEBUG: CompressedLinear has packed_weight, dtype: {module.packed_weight.dtype}")
+            break  # Just check the first one
+    
+    if has_compressed:
+        print(f"DEBUG: Model has compressed layers, checking if dequantization is happening...")
+    
     output = model_instance(input_ids)
     
     # Debug: Check if logits look reasonable
