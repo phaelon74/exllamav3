@@ -200,6 +200,22 @@ def load_transformers(model_dir: str, auto = False, bf16 = False):
     print(f"DEBUG: Model type: {type(model)}")
     print(f"DEBUG: First layer type: {type(list(model.modules())[10])}")
     
+    # Check what device the model is on
+    if hasattr(model, 'device'):
+        print(f"DEBUG: Model device: {model.device}")
+    if hasattr(model, 'model') and hasattr(model.model, 'embed_tokens'):
+        print(f"DEBUG: Embedding device: {model.model.embed_tokens.weight.device}")
+    
+    # Check if using device_map="auto"
+    if auto:
+        print(f"DEBUG: Loaded with device_map='auto'")
+        # Find first Linear/CompressedLinear layer device
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Linear) or module.__class__.__name__ == 'CompressedLinear':
+                if hasattr(module, 'weight'):
+                    print(f"DEBUG: First linear layer ({name}) is on device: {module.weight.device}")
+                break
+    
     bpw_layer, bpw_head, vram_bits = get_storage_info(model)
     return model, bpw_layer, bpw_head, vram_bits
 
