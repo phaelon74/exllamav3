@@ -1,0 +1,9 @@
+[
+    {
+        "load_fn": "transformers_auto",
+        "fwd_fn": "transformers",
+        "label": "NVFP4 (Small Model)",
+        "model_dir": "/path/to/your/small/nvfp4/model"
+    }
+]
+

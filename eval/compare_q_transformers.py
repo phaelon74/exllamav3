@@ -181,85 +181,8 @@ def load_transformers_auto_bf16(model_dir: str):
     return load_transformers(model_dir, auto = True, bf16 = True)
 
 @torch.inference_mode
-def load_transformers_tensor_parallel(model_dir: str):
-    """
-    Load model with tensor parallelism using device_map="auto".
-    Supports compressed-tensors quantization (NVFP4, etc.)
-    Args can be passed as [model_dir, kwargs_dict] for advanced configs.
-    """
-    # Support both string and [string, dict] formats
-    if isinstance(model_dir, list):
-        actual_model_dir = model_dir[0]
-        kwargs = model_dir[1] if len(model_dir) > 1 else {}
-    else:
-        actual_model_dir = model_dir
-        kwargs = {}
-    
-    # Default parameters for tensor parallel loading
-    default_params = {
-        "device_map": "auto",
-        "dtype": torch.bfloat16,  # Use 'dtype' not 'torch_dtype' (deprecated)
-        "trust_remote_code": True,  # Often needed for compressed-tensors models
-        "low_cpu_mem_usage": True,
-    }
-    
-    # Override defaults with user-provided kwargs
-    # Handle dtype/torch_dtype string conversion
-    for dtype_key in ["dtype", "torch_dtype"]:
-        if dtype_key in kwargs and isinstance(kwargs[dtype_key], str):
-            dtype_str = kwargs[dtype_key]
-            dtype_value = None
-            if dtype_str == "bfloat16":
-                dtype_value = torch.bfloat16
-            elif dtype_str == "float16":
-                dtype_value = torch.float16
-            elif dtype_str == "float32":
-                dtype_value = torch.float32
-            elif dtype_str == "auto":
-                dtype_value = "auto"
-            
-            if dtype_value is not None:
-                # Use 'dtype' as the preferred parameter name
-                kwargs.pop(dtype_key, None)
-                kwargs["dtype"] = dtype_value
-    
-    default_params.update(kwargs)
-    
-    print(f"Loading model with tensor parallelism: {actual_model_dir}")
-    print(f"Parameters: {default_params}")
-    
-    model = AutoModelForCausalLM.from_pretrained(
-        actual_model_dir,
-        **default_params
-    )
-    
-    bpw_layer, bpw_head, vram_bits = get_storage_info(model)
-    return model, bpw_layer, bpw_head, vram_bits
-
-@torch.inference_mode
 def fwd_transformers(model_instance, input_ids: torch.Tensor):
     input_ids = input_ids.to("cuda:0")
-    output = model_instance(input_ids)
-    return output.logits
-
-@torch.inference_mode
-def fwd_transformers_auto(model_instance, input_ids: torch.Tensor):
-    """
-    Forward pass for models loaded with device_map="auto".
-    Lets the model handle device placement automatically.
-    """
-    # Don't force device placement - let the model handle it
-    # The model already knows where its tensors are
-    if hasattr(model_instance, 'device'):
-        # If model has a .device attribute, use it
-        input_ids = input_ids.to(model_instance.device)
-    elif hasattr(model_instance, 'model') and hasattr(model_instance.model, 'embed_tokens'):
-        # Otherwise, use the device of the embedding layer
-        input_ids = input_ids.to(model_instance.model.embed_tokens.weight.device)
-    else:
-        # Fallback: assume first device
-        input_ids = input_ids.to('cuda:0')
-    
     output = model_instance(input_ids)
     return output.logits
 

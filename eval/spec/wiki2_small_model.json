@@ -1,0 +1,9 @@
+{
+    "tokenize_fn": "transformers",
+    "tokenizer_dir": "/path/to/your/small/nvfp4/model",
+    "dataset": "wiki2",
+    "eval_stride": 512,
+    "eval_len": 2048,
+    "max_rows": 20
+}
+

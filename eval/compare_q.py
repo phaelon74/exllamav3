@@ -24,9 +24,7 @@ from compare_q_transformers import (
     load_transformers_auto_bf16,
     load_transformers_auto,
     load_transformers,
-    load_transformers_tensor_parallel,
     fwd_transformers,
-    fwd_transformers_auto,
     tokenize_transformers
 )
 from compare_q_exllamav2 import (
@@ -58,7 +56,6 @@ load_fns = {
     "transformers_auto_bf16": load_transformers_auto_bf16,
     "transformers_auto": load_transformers_auto,
     "transformers": load_transformers,
-    "transformers_tp": load_transformers_tensor_parallel,
     "exllamav2": load_exllamav2,
     "exllamav3": load_exllamav3,
     "llamacpp": load_llamacpp,
@@ -69,7 +66,6 @@ load_fns = {
 
 fwd_fns = {
     "transformers": fwd_transformers,
-    "transformers_auto": fwd_transformers_auto,
     "exllamav2": fwd_exllamav2,
     "exllamav3": fwd_exllamav3,
     "llamacpp": fwd_llamacpp,
