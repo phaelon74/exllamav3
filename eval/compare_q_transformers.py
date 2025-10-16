@@ -86,12 +86,16 @@ def get_storage_info(model):
             return False
         return isinstance(module, tuple(valid_types))
     
+    compressed_count = 0
+    linear_count = 0
+    
     for name, module in model.named_modules():
         # Check for CompressedLinear by type or class name (fallback)
         is_compressed = (check_isinstance(module, [CompressedLinear]) or 
                         module.__class__.__name__ == 'CompressedLinear')
         
         if is_compressed:
+            compressed_count += 1
             # Compressed-tensors quantization (NVFP4, etc.)
             # Sum all parameters in the compressed module
             module_bits = get_tensors_size(dict(module.named_parameters()))
@@ -115,6 +119,7 @@ def get_storage_info(model):
             # Skip CompressedLinear (handled above) - it inherits from Linear but has different attributes
             if module.__class__.__name__ == 'CompressedLinear':
                 continue
+            linear_count += 1
             # Regular linear layers
             if module.out_features >= model.vocab_size * 0.9:
                 head_bpw = module.weight.element_size() * 8
@@ -159,6 +164,9 @@ def get_storage_info(model):
         print("Warning: Could not detect quantization format, estimating BPW from total parameters")
         return 16.0, 16.0, sum_bits  # Default to FP16
     
+    print(f"DEBUG: Found {compressed_count} CompressedLinear layers, {linear_count} regular Linear layers")
+    print(f"DEBUG: sum_bits={sum_bits}, sum_numel={sum_numel}, layer_bpw={sum_bits/sum_numel:.3f}")
+    
     vram_bits = head_numel * head_bpw + sum_bits
     return sum_bits / sum_numel, head_bpw, vram_bits
 
@@ -184,7 +192,13 @@ def load_transformers_auto_bf16(model_dir: str):
 def fwd_transformers(model_instance, input_ids: torch.Tensor):
     input_ids = input_ids.to("cuda:0")
     output = model_instance(input_ids)
-    return output.logits
+    
+    # Debug: Check if logits look reasonable
+    logits = output.logits
+    print(f"DEBUG FWD: logits shape={logits.shape}, min={logits.min():.3f}, max={logits.max():.3f}, mean={logits.mean():.3f}")
+    print(f"DEBUG FWD: First 10 logits: {logits[0, 0, :10].tolist()}")
+    
+    return logits
 
 @torch.inference_mode
 def tokenize_transformers(tokenizer_dir: str, text: str):
