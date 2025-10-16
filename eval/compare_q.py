@@ -47,6 +47,10 @@ from compare_q_qtip import (
     load_qtip,
     fwd_qtip,
 )
+from compare_q_vllm import (
+    load_vllm,
+    fwd_vllm,
+)
 
 load_fns = {
     "transformers_auto_bf16": load_transformers_auto_bf16,
@@ -57,6 +61,7 @@ load_fns = {
     "llamacpp": load_llamacpp,
     "anyprecision": load_anyprecision,
     "qtip": load_qtip,
+    "vllm": load_vllm,
 }
 
 fwd_fns = {
@@ -66,6 +71,7 @@ fwd_fns = {
     "llamacpp": fwd_llamacpp,
     "anyprecision": fwd_anyprecision,
     "qtip": fwd_qtip,
+    "vllm": fwd_vllm,
 }
 
 tokenize_fns = {

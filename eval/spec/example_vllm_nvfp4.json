@@ -1,0 +1,9 @@
+[
+    {
+        "load_fn": "vllm",
+        "fwd_fn": "vllm",
+        "label": "vLLM NVFP4",
+        "model_dir": "/path/to/your/nvfp4/compressed_tensor/model"
+    }
+]
+
