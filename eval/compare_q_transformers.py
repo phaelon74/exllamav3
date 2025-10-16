@@ -30,6 +30,11 @@ try:
 except (ModuleNotFoundError, ImportError):
     Linear4bit = None
 
+try:
+    from compressed_tensors.nn import CompressedLinear
+except (ModuleNotFoundError, ImportError):
+    CompressedLinear = None
+
 def get_tensors_size(tensors):
     return 8 * sum(t.element_size() * t.numel() for t in tensors.values() if t is not None)
 
@@ -82,7 +87,18 @@ def get_storage_info(model):
         return isinstance(module, tuple(valid_types))
     
     for name, module in model.named_modules():
-        if check_isinstance(module, [Linear4bit]):
+        if check_isinstance(module, [CompressedLinear]):
+            # Compressed-tensors quantization (NVFP4, etc.)
+            # Sum all parameters in the compressed module
+            module_bits = get_tensors_size(dict(module.named_parameters()))
+            module_numel = module.in_features * module.out_features
+            if module.out_features >= model.vocab_size * 0.9:
+                head_bpw = module_bits / module_numel
+                head_numel = module_numel
+            else:
+                sum_bits += module_bits
+                sum_numel += module_numel
+        elif check_isinstance(module, [Linear4bit]):
             if module.out_features >= model.vocab_size * 0.9:  # this is foolproof
                 head_numel = module.in_features * module.out_features
                 head_bpw = module.weight.numel() * 8
@@ -174,23 +190,30 @@ def load_transformers_tensor_parallel(model_dir: str):
     # Default parameters for tensor parallel loading
     default_params = {
         "device_map": "auto",
-        "torch_dtype": torch.bfloat16,
+        "dtype": torch.bfloat16,  # Use 'dtype' not 'torch_dtype' (deprecated)
         "trust_remote_code": True,  # Often needed for compressed-tensors models
         "low_cpu_mem_usage": True,
     }
     
     # Override defaults with user-provided kwargs
-    # Handle torch_dtype string conversion
-    if "torch_dtype" in kwargs and isinstance(kwargs["torch_dtype"], str):
-        dtype_str = kwargs["torch_dtype"]
-        if dtype_str == "bfloat16":
-            kwargs["torch_dtype"] = torch.bfloat16
-        elif dtype_str == "float16":
-            kwargs["torch_dtype"] = torch.float16
-        elif dtype_str == "float32":
-            kwargs["torch_dtype"] = torch.float32
-        elif dtype_str == "auto":
-            kwargs["torch_dtype"] = "auto"
+    # Handle dtype/torch_dtype string conversion
+    for dtype_key in ["dtype", "torch_dtype"]:
+        if dtype_key in kwargs and isinstance(kwargs[dtype_key], str):
+            dtype_str = kwargs[dtype_key]
+            dtype_value = None
+            if dtype_str == "bfloat16":
+                dtype_value = torch.bfloat16
+            elif dtype_str == "float16":
+                dtype_value = torch.float16
+            elif dtype_str == "float32":
+                dtype_value = torch.float32
+            elif dtype_str == "auto":
+                dtype_value = "auto"
+            
+            if dtype_value is not None:
+                # Use 'dtype' as the preferred parameter name
+                kwargs.pop(dtype_key, None)
+                kwargs["dtype"] = dtype_value
     
     default_params.update(kwargs)
     
