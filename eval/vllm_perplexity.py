@@ -36,13 +36,13 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
     print(f"Quantization: {quantization}")
     print(f"Max model length: {max_model_len}")
     
-    # IMPORTANT: Set max_model_len = context_length to avoid the +1 token issue
+    # Set max_model_len to context_length + 1 to allow for the required 1-token generation
     llm = LLM(
         model=model_path,
         quantization=quantization,
         tensor_parallel_size=tensor_parallel_size,
         gpu_memory_utilization=gpu_memory_utilization,
-        max_model_len=context_length,  # Set to context length, not +1
+        max_model_len=context_length + 1,  # +1 for required token generation
         trust_remote_code=True,
         seed=1234,
     )
@@ -66,14 +66,14 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
     prev_end_loc = 0
     
     # Create sampling params that request prompt logprobs
-    # IMPORTANT: vLLM limits prompt_logprobs to maximum 20
-    # We'll use 20 and handle missing tokens with fallback penalties
-    # Note: This means perplexity for rare/unexpected tokens will be approximate
+    # IMPORTANT: Following lm-eval's approach, use prompt_logprobs=1
+    # vLLM automatically includes the actual ground-truth token in the dict
+    # even if it's not in the top-K, so this should capture all tokens
     sampling_params = SamplingParams(
         temperature=0.0,
         max_tokens=1,  # We need at least 1 token generation
-        prompt_logprobs=20,  # Maximum allowed by vLLM
-        logprobs=20,  # Also for generated tokens
+        prompt_logprobs=1,  # Following lm-eval's pattern
+        detokenize=False,  # Don't decode tokens
     )
     
     print(f"Calculating perplexity with stride {stride}...")
@@ -89,11 +89,6 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
         # Skip if window is too short
         if len(input_ids_window) < 2:
             break
-            
-        # CRITICAL: Only use context_length - 1 tokens as input
-        # to leave room for the 1 token generation vLLM requires
-        if len(input_ids_window) >= context_length:
-            input_ids_window = input_ids_window[:context_length - 1]
             
         # Generate with vLLM using TokensPrompt
         try:
@@ -118,11 +113,11 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
                 trg_len = len(prompt_logprobs)
             
             # Sum the log probabilities of the actual tokens
+            # Following lm-eval's approach: vLLM includes the actual token in logprob_dict
             window_nll = 0.0
-            tokens_skipped = 0
+            valid_tokens = 0
             for i, logprob_dict in enumerate(prompt_logprobs[-trg_len:]):
                 if logprob_dict is None:
-                    tokens_skipped += 1
                     continue
                 # Get the actual token at this position
                 actual_token = input_ids[prev_end_loc + i].item()
@@ -130,25 +125,24 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
                     # logprob_dict[token] is a Logprob object, get its .logprob attribute
                     token_logprob = getattr(logprob_dict[actual_token], 'logprob', logprob_dict[actual_token])
                     window_nll -= token_logprob
+                    valid_tokens += 1
                 else:
-                    # Token not in top-20 (vLLM's limit), assign penalty
-                    # This is an approximation - the token was outside top-20 predictions
-                    # We use a reasonable penalty that reflects low but non-zero probability
-                    if tokens_skipped < 5:  # Only print first few warnings per window
-                        print(f"Warning: Token {actual_token} not in top-20 at position {i}, using penalty")
-                    window_nll += 15.0  # Penalty for tokens outside top-20 (~rank 50-100 equivalent)
-                    tokens_skipped += 1
+                    # This should rarely happen if vLLM includes the actual token
+                    print(f"Warning: Token {actual_token} not in logprobs at position {i}")
             
             # Only add this window if we got most tokens
-            if tokens_skipped > trg_len * 0.1:  # More than 10% tokens missing
-                print(f"Warning: Window {num_windows} had {tokens_skipped}/{trg_len} tokens missing, skipping")
+            if valid_tokens < trg_len * 0.5:  # Less than 50% valid tokens
+                print(f"Warning: Window {num_windows} had only {valid_tokens}/{trg_len} valid tokens, skipping")
                 continue
-                    
+            
+            # Add the window NLL
             nlls.append(window_nll)
             num_windows += 1
             
         except Exception as e:
             print(f"Error processing window {num_windows}: {e}")
+            import traceback
+            traceback.print_exc()
             continue
         
         prev_end_loc = end_loc
@@ -168,6 +162,7 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
     total_nll = sum(nlls)
     num_tokens = prev_end_loc
     
+    # Perplexity = exp(average negative log likelihood per token)
     ppl = math.exp(total_nll / num_tokens)
     
     print(f"\nResults:")
