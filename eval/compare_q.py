@@ -188,8 +188,16 @@ def test_ppl(data_spec: dict, spec: dict, logits_file: str):
 
             # ppl
             logits = logits[:, :-1, :]
-            logits += 1e-10
             log_probs = F.log_softmax(logits, dim = -1)
+            
+            # DEBUG: Check first few target log probs
+            if row == 0:
+                target_ids = input_ids[:, 1:].to(log_probs.device)
+                target_log_probs_debug = log_probs.gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
+                print(f"DEBUG PPL: First 10 target log probs: {target_log_probs_debug[0, :10].tolist()}")
+                print(f"DEBUG PPL: Mean target log prob (first row): {target_log_probs_debug.mean().item():.6f}")
+                print(f"DEBUG PPL: Min/Max target log prob: {target_log_probs_debug.min().item():.6f} / {target_log_probs_debug.max().item():.6f}")
+            
             del logits
             target_ids = input_ids[:, 1:].to(log_probs.device)
             del input_ids
