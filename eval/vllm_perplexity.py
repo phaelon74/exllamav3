@@ -4,7 +4,7 @@ This script properly tests QUANTIZED models (not decompressed).
 """
 
 import torch
-from vllm import LLM, SamplingParams
+from vllm import LLM, SamplingParams, TokensPrompt
 from datasets import load_dataset
 from tqdm import tqdm
 import math
@@ -91,10 +91,10 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
         if len(input_ids_window) >= context_length:
             input_ids_window = input_ids_window[:context_length - 1]
             
-        # Generate with vLLM
+        # Generate with vLLM using TokensPrompt
         try:
             outputs = llm.generate(
-                prompt_token_ids=[input_ids_window],
+                prompts=[TokensPrompt(prompt_token_ids=input_ids_window)],
                 sampling_params=sampling_params,
                 use_tqdm=False,
             )
