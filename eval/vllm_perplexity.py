@@ -66,10 +66,14 @@ def calculate_perplexity(model_path: str, max_model_len: int = 2048,
     prev_end_loc = 0
     
     # Create sampling params that request prompt logprobs
+    # IMPORTANT: prompt_logprobs must be high enough to include actual tokens
+    # If a token isn't in top-K, we can't calculate its probability!
+    # Setting to None requests ALL vocabulary logprobs (expensive but necessary for accuracy)
     sampling_params = SamplingParams(
         temperature=0.0,
         max_tokens=1,  # We need at least 1 token generation
-        prompt_logprobs=1,  # Request logprobs for all prompt tokens
+        prompt_logprobs=None,  # None = return all vocab logprobs (or use large number like 100)
+        logprobs=None,  # Also request full logprobs for generated tokens
     )
     
     print(f"Calculating perplexity with stride {stride}...")
